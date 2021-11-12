@@ -1,0 +1,1 @@
+web: gunicorn patashida.wsgi --log-file -
