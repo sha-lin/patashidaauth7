@@ -1,197 +1,232 @@
+from django.db.models.query import QuerySet
 from django.shortcuts import render
-from rest_framework import generics, status, views, permissions
-from .serializers import RegisterSerializer, SetNewPasswordSerializer, ResetPasswordEmailRequestSerializer, EmailVerificationSerializer, LoginSerializer, LogoutSerializer
+from rest_framework import permissions, serializers
+from rest_framework.settings import perform_import
+
+from agriapp.permissions import IsAdminOrReadOnly
+from .models import Profile, Vaccine, EmergingDisease,Growth
+
+from django.contrib.auth.models import User
+from rest_framework.exceptions import NotFound
+from rest_framework.permissions import AllowAny, IsAuthenticated
+
+# authentication
+from django.contrib.auth import authenticate, login, logout
+
+
+# api
+from django.http import JsonResponse
+from rest_framework import status,generics
+from django.http import Http404
 from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken
-from .models import User
-from .utils import Util
-from django.contrib.sites.shortcuts import get_current_site
-from django.urls import reverse
-import jwt
-from django.conf import settings
-from drf_yasg.utils import swagger_auto_schema
-from drf_yasg import openapi
-from .renderers import UserRenderer
-from django.contrib.auth.tokens import PasswordResetTokenGenerator
-from django.utils.encoding import smart_str, force_str, smart_bytes, DjangoUnicodeDecodeError
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
-from django.contrib.sites.shortcuts import get_current_site
-from django.urls import reverse
-from .utils import Util
-from django.shortcuts import redirect
-from django.http import HttpResponsePermanentRedirect
-import os
+from rest_framework.views import APIView
+from .serializer import  ProfileSerializer, UserSerializer,UserCreateSerializer, VaccineSerializer,EmergingDiseaseSerializer,GrowthSerializer
+
+# VaccineSerializer
+from .permissions import IsAdminOrReadOnly
 
 
 # Create your views here.
 
-class CustomRedirect(HttpResponsePermanentRedirect):
-
-    allowed_schemes = [os.environ.get('APP_SCHEME'), 'http', 'https']
-
+def index(request):
+    return render(request, 'index.html')
 
 
-class RegisterView(generics.CreateAPIView):
-    permission_classes = ()
-    serializer_class = RegisterSerializer
-    def post(self, request, **kwargs):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer_data = serializer.validated_data
-        serializer.save()
-        res = {}
-        try:
-            user = User.objects.get(
-                email=serializer_data.get('email'))
-        except User.DoesNotExist:
-            return Response({'error': 'user does not exist'}, status=status.HTTP_200_OK)
-        if user.is_active:
-            res.update(
-                {
-                    'success_message': 'Account creation was successful',
-                    'status': status.HTTP_201_CREATED,
-                    'refresh': user.tokens()['refresh'],
-                    'access': user.tokens()['access']
-                }
-            )
-        else:
-            res.update({
-                'activate account': 'please check your email to activate account'
-            })
-        return Response(res, status=res.get('status'))
+# rest api ====================================
 
-# class RegisterView(generics.GenericAPIView):
+class UserList(APIView): # list all users
+    """
+    List all users.
+    """
+    permission_classes = (IsAdminOrReadOnly,)
 
-#     serializer_class = RegisterSerializer
-#     renderer_classes = (UserRenderer,)
+    def get(self, request, format=None):
+        users = User.objects.all()
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)
 
-#     def post(self, request):
-#         user = request.data
-#         serializer = self.serializer_class(data=user)
-#         serializer.is_valid(raise_exception=True)
-#         serializer.save()
-#         user_data = serializer.data
-#         user = User.objects.get(email=user_data['email'])
-#         token = RefreshToken.for_user(user).access_token
-#         current_site = get_current_site(request).domain
-#         relativeLink = reverse('email-verify')
-#         absurl = 'http://'+current_site+relativeLink+"?token="+str(token)
-#         email_body = 'Hi '+user.username + \
-#             ' Use the link below to verify your email \n' + absurl
-#         data = {'email_body': email_body, 'to_email': user.email,
-#                 'email_subject': 'Verify your email'}
+class UserCreate(APIView): # create user
+    """
+    Create a user.
+    """
+    permission_classes = (IsAdminOrReadOnly,)
 
-#         Util.send_email(data)
-#         return Response(user_data, status=status.HTTP_201_CREATED)
+    def post(self, request, format=None):
+        serializer = UserCreateSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        
 
-
-class VerifyEmail(views.APIView):
-    serializer_class = EmailVerificationSerializer
-
-    token_param_config = openapi.Parameter(
-        'token', in_=openapi.IN_QUERY, description='Description', type=openapi.TYPE_STRING)
-
-    @swagger_auto_schema(manual_parameters=[token_param_config])
-    def post(self, request):
-        token = request.GET.get('token')
-        try:
-            payload = jwt.decode(token, settings.SECRET_KEY)
-            user = User.objects.get(id=payload['user_id'])
-            if not user.is_verified:
-                user.is_verified = True
-                user.save()
-            return Response({'email': 'Successfully activated'}, status=status.HTTP_200_OK)
-        except jwt.ExpiredSignatureError as identifier:
-            return Response({'error': 'Activation Expired'}, status=status.HTTP_400_BAD_REQUEST)
-        except jwt.exceptions.DecodeError as identifier:
-            return Response({'error': 'Invalid token'}, status=status.HTTP_400_BAD_REQUEST)
-
-class LoginAPIView(generics.GenericAPIView):
-    serializer_class = LoginSerializer
-
-    def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-
-class RequestPasswordResetEmail(generics.GenericAPIView):
-    serializer_class = ResetPasswordEmailRequestSerializer
-
-    def post(self, request):
-        serializer = self.serializer_class(data=request.data)
-
-        email = request.data.get('email', '')
-
-        if User.objects.filter(email=email).exists():
-            user = User.objects.get(email=email)
-            uidb64 = urlsafe_base64_encode(smart_bytes(user.id))
-            token = PasswordResetTokenGenerator().make_token(user)
-            current_site = get_current_site(
-                request=request).domain
-            relativeLink = reverse(
-                'password-reset-confirm', kwargs={'uidb64': uidb64, 'token': token})
-
-            redirect_url = request.data.get('redirect_url', '')
-            absurl = 'http://'+current_site + relativeLink
-            email_body = 'Hello, \n Use link below to reset your password  \n' + \
-                absurl+"?redirect_url="+redirect_url
-            data = {'email_body': email_body, 'to_email': user.email,
-                    'email_subject': 'Reset your passsword'}
-            Util.send_email(data)
-        return Response({'success': 'We have sent you a link to reset your password'}, status=status.HTTP_200_OK)
-
-
-class PasswordTokenCheckAPI(generics.GenericAPIView):
-    serializer_class = SetNewPasswordSerializer
-
-    def get(self, request, uidb64, token):
-
-        redirect_url = request.GET.get('redirect_url')
-
-        try:
-            id = smart_str(urlsafe_base64_decode(uidb64))
-            user = User.objects.get(id=id)
-
-            if not PasswordResetTokenGenerator().check_token(user, token):
-                if len(redirect_url) > 3:
-                    return CustomRedirect(redirect_url+'?token_valid=False')
-                else:
-                    return CustomRedirect(os.environ.get('FRONTEND_URL', '')+'?token_valid=False')
-
-            if redirect_url and len(redirect_url) > 3:
-                return CustomRedirect(redirect_url+'?token_valid=True&message=Credentials Valid&uidb64='+uidb64+'&token='+token)
+# login user ====================================>
+class loginUser(APIView):
+    def post(self, request, format=None):
+        username = request.data.get('username')
+        password = request.data.get('password')
+        user = authenticate(username=username, password=password)
+        if user is not None:
+            if user.is_active:
+                login(request, user)
+                serializer = UserSerializer(user)
+                return Response(serializer.data)
             else:
-                return CustomRedirect(os.environ.get('FRONTEND_URL', '')+'?token_valid=False')
-
-        except DjangoUnicodeDecodeError as identifier:
-            try:
-                if not PasswordResetTokenGenerator().check_token(user):
-                    return CustomRedirect(redirect_url+'?token_valid=False')
-                    
-            except UnboundLocalError as e:
-                return Response({'error': 'Token is not valid, please request a new one'}, status=status.HTTP_400_BAD_REQUEST)
+                return Response(status=status.HTTP_404_NOT_FOUND)
+        else:
+            return Response(status=status.HTTP_404_NOT_FOUND)
 
 
-
-class SetNewPasswordAPIView(generics.GenericAPIView):
-    serializer_class = SetNewPasswordSerializer
-
-    def patch(self, request):
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        return Response({'success': True, 'message': 'Password reset success'}, status=status.HTTP_200_OK)
+# logout user ====================================
+class logoutUser(APIView): # logout user
+    def get(self, request, format=None):
+        logout(request)
+        return Response(status=status.HTTP_200_OK)
 
 
-class LogoutAPIView(generics.GenericAPIView):
-    serializer_class = LogoutSerializer
 
-    permission_classes = (permissions.IsAuthenticated,)
 
-    def post(self, request):
 
-        serializer = self.serializer_class(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
+# ProfileList
+class ProfileList(APIView):
+    permission_classes = (IsAdminOrReadOnly,)
 
+    def get(self, request, format=None):
+        all_profiles = Profile.objects.all()
+        serializers = ProfileSerializer(all_profiles, many=True)
+        return Response(serializers.data)
+
+    def post(self, request, format=None):
+        serializers = ProfileSerializer(data=request.data)
+        if serializers.is_valid():
+            serializers.save()
+            return Response(serializers.data, status=status.HTTP_201_CREATED)
+        return Response(serializers.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ProfileDetail
+class ProfileDetail(APIView):
+    permission_classes = (IsAdminOrReadOnly,)
+
+    def get_object(self, pk):
+        try:
+            return Profile.objects.get(pk=pk)
+        except Profile.DoesNotExist:
+            raise Http404
+
+    def get(self, request, pk, format=None):
+        profile = self.get_object(pk)
+        serializers = ProfileSerializer(profile)
+        return Response(serializers.data)
+
+    def put(self, request, pk, format=None):
+        profile = self.get_object(pk)
+        serializers = ProfileSerializer(profile, data=request.data)
+        if serializers.is_valid():
+            serializers.save()
+            return Response(serializers.data)
+        return Response(serializers.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def delete(self, request, pk, format=None):
+        profile = self.get_object(pk)
+        profile.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class VaccineList(generics.ListCreateAPIView):
+    querySet = Vaccine.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = VaccineSerializer
+    
+    def list(self, request):
+        queryset = self.get_queryset()
+        serializer = VaccineSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_204_OK)
+    
+    def create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({'message': f"Vaccine {serializer.data['title']} has been created"}, status=status.HTTP_201_CREATED)
+        
+
+class VaccineDetail(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = VaccineSerializer
+    Lookup_url_kwargs = 'vaccine_id'
+    
+    
+    def get_queryset(self):
+        vaccine_id = self.kwargs["pk"]
+        return Vaccine.objects.filter(pk=vaccine_id)
+
+
+    def get(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        serializer = VaccineSerializer(queryset, many=True)
+        if len(serializer.data):
+            [response] = serializer.data
+        else:
+            raise NotFound('The vaccine is not found',
+                           code='vaccine_not_found')
+
+        return Response(response, status=status.HTTP_200_OK)
+    
+    # growth=========>
+class GrowthList(generics.ListCreateAPIView):
+    querySet = Growth.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = GrowthSerializer
+    
+    def list(self, request):
+        queryset = self.get_queryset()
+        serializer = GrowthSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_204_OK)
+    
+    def create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({'message': f"Growth has been created"}, status=status.HTTP_201_CREATED)
+    
+class GrowthDetail(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = GrowthSerializer
+    Lookup_url_kwargs = 'growth_id'
+
+
+# emerging disease=========>
+class EmergingDiseaseList(generics.ListCreateAPIView):
+    querySet = EmergingDisease.objects.all()
+    permission_classes = [IsAuthenticated]
+    serializer_class = EmergingDiseaseSerializer
+    
+    def list(self, request):
+        queryset = self.get_queryset()
+        serializer = EmergingDiseaseSerializer(queryset, many=True)
+        return Response(serializer.data, status=status.HTTP_204_OK)
+    
+    def create(self, request):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response({'message': f"Disease has been created"}, status=status.HTTP_201_CREATED)
+        
+
+class EmergingDiseaseDetail(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = EmergingDiseaseSerializer
+    Lookup_url_kwargs = 'disease_id'
+    
+    
+    # def get_queryset(self):
+    #     vaccine_id = self.kwargs["pk"]
+    #     return EmergingDisease.objects.filter(pk=vaccine_id)
+
+
+    # def get(self, request, *args, **kwargs):
+    #     queryset = self.get_queryset()
+    #     serializer = EmergingDiseaseSerializer(queryset, many=True)
+    #     if len(serializer.data):
+    #         [response] = serializer.data
+    #     else:
+    #         raise NotFound('The EmergingDetails is not found',
+    #                        code='EmergingDetails_not_found')

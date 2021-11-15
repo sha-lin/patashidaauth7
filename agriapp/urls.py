@@ -1,20 +1,27 @@
+from django.conf.urls import url
 from django.urls import path
-from .views import RegisterView, LogoutAPIView, SetNewPasswordAPIView, VerifyEmail, LoginAPIView, PasswordTokenCheckAPI, RequestPasswordResetEmail
-from rest_framework_simplejwt.views import (
-    TokenRefreshView,
-)
+from . import views
+from django.conf import settings
+from django.conf.urls.static import static
 
 
 urlpatterns = [
-    path('register/', RegisterView.as_view(), name="register"),
-    path('login/', LoginAPIView.as_view(), name="login"),
-    path('logout/', LogoutAPIView.as_view(), name="logout"),
-    path('email-verify/', VerifyEmail.as_view(), name="email-verify"),
-    path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('request-reset-email/', RequestPasswordResetEmail.as_view(),
-         name="request-reset-email"),
-    path('password-reset/<uidb64>/<token>/',
-         PasswordTokenCheckAPI.as_view(), name='password-reset-confirm'),
-    path('password-reset-complete', SetNewPasswordAPIView.as_view(),
-         name='password-reset-complete')
+    path('', views.index, name='index'),
+    # api
+   
+    url(r'^api/profiles/$', views.ProfileList.as_view()), # list of profiles
+    url(r'^api/profiles/(?P<pk>[0-9]+)/$', views.ProfileDetail.as_view()), # single profile
+    url(r'^api/users/$', views.UserList.as_view()), # list of users
+    url(r'^api/users/create/$', views.UserCreate.as_view()), # create user
+    url(r'^api/auth/login/$', views.loginUser.as_view()), # login user
+    url(r'^api/auth/logout/$', views.logoutUser.as_view()), # logout user
+    url(r'^api/vaccine/$', views.VaccineList.as_view(), name="vaccines"),
+    url(r'^api/emergingdisease/$', views.EmergingDiseaseList.as_view(), name="emergingDisease"),
+    url(r'^api/growth/$', views.GrowthList.as_view(), name="growth"),
+    url(r'^api/vaccines/<int:pk>/', views.VaccineDetail.as_view(), name="vaccines_detail")
 ]
+
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL,
+                          document_root=settings.MEDIA_ROOT)
