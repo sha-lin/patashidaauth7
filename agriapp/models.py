@@ -1,7 +1,6 @@
 from django.db import models
 import datetime as dt
 from django.urls import reverse
-from django.contrib.auth.models import User
 from url_or_relative_url_field.fields import URLOrRelativeURLField
 
 # cloudinary
@@ -16,6 +15,7 @@ class Category(models.Model):
 
     def __str__(self):
         return f"{ self.name }"
+
 
 
 
