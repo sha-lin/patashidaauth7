@@ -1,7 +1,7 @@
 from rest_framework import serializers
 
 
-from .models import Profile,Vaccine,EmergingDisease,Growth
+from .models import Profile
 
 # cloudinary
 from cloudinary.models import CloudinaryField
@@ -33,24 +33,3 @@ class ProfileSerializer(serializers.ModelSerializer):
         model = Profile
         fields = ("user_name", "parent_name", "place of birth", "contact", "location", "address", "DoB", "updated_at")
 
-class VaccineSerializer(serializers.ModelSerializer):
-    # category = serializers.StringRelatedField()
-    class Meta:
-        model = Vaccine
-        fields = ['title', 'vaccine_name', 'batch_number', 'drug_expiry', 'next_appointment','user_profile'] 
-        
-         
-        # growth======
-class GrowthSerializer(serializers.ModelSerializer):
-    # category = serializers.StringRelatedField()
-    class Meta:
-        model = Growth
-        fields = ['patient','patient_name','age', 'weight', 'height', 'HO','date']     
-    
-    
-    # emerging disease====
-class EmergingDiseaseSerializer(serializers.ModelSerializer):
-    # category = serializers.StringRelatedField()
-    class Meta:
-        model = EmergingDisease
-        fields = ['disease_name', 'patient']   
