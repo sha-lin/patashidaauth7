@@ -125,7 +125,7 @@ WSGI_APPLICATION = 'patashida.wsgi.application'
 DATABASES = {
      'default': {
        'ENGINE': 'django.db.backends.postgresql',
-        'NAME':'agric',
+        'NAME':'agriculture',
         'USER':'shalin',
         'PASSWORD':'Chepkoech03',
     }
