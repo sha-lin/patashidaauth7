@@ -44,7 +44,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-AUTH_USER_MODEL = 'agriapp.urls'
+AUTH_USER_MODEL = 'patashida.urls'
 
 
 
