@@ -29,7 +29,7 @@ urlpatterns = [
     ),
     path("accounts/", include("django_registration.backends.one_step.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
-    url(r"app/", include("app.urls")),
+    url(r"agriapp/", include("agriapp.urls")),
     url(r'^api-auth/', obtain_auth_token),
     url(r'', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     url(r'^redoc/$', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),

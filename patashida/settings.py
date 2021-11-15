@@ -44,7 +44,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-# AUTH_USER_MODEL = 'patashida.urls'
+# AUTH_USER_MODEL = 'agriapp.urls'
 
 
 
@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django_registration',
-    'agriapp.apps.AppConfig',
+    'agriapp',
     'bootstrap5',
     'cloudinary',
     'rest_framework',

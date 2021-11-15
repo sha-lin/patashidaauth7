@@ -1,6 +1,6 @@
 from django.db.models.query import QuerySet
 from django.shortcuts import render
-from rest_framework import permissions, serializer
+from rest_framework import permissions,serializers
 from rest_framework.settings import perform_import
 
 from agriapp.permissions import IsAdminOrReadOnly
@@ -19,7 +19,7 @@ from rest_framework import status,generics
 from django.http import Http404
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .serializer import  ProfileSerializer, UserSerializer,UserCreateSerializer
+from .serializers import  ProfileSerializer, UserSerializer,UserCreateSerializer
 
 # VaccineSerializer
 from .permissions import IsAdminOrReadOnly
