@@ -1,62 +1,100 @@
 from django.db import models
-from django.contrib.auth.models import (
-    AbstractBaseUser, BaseUserManager, PermissionsMixin)
+import datetime as dt
+from django.urls import reverse
+from url_or_relative_url_field.fields import URLOrRelativeURLField
 
-from django.db import models
-from rest_framework_simplejwt.tokens import RefreshToken
+# cloudinary
+from cloudinary.models import CloudinaryField
+from django.contrib.auth.models import User
+
 
 # Create your models here.
-class UserManager(BaseUserManager):
 
-    def create_user(self, username, email, password=None):
-        if username is None:
-            raise TypeError('Users should have a username')
-        if email is None:
-            raise TypeError('Users should have a Email')
-
-        user = self.model(username=username, email=self.normalize_email(email))
-        user.set_password(password)
-        user.save()
-        return user
-
-    def create_superuser(self, username, email, password=None):
-        if password is None:
-            raise TypeError('Password should not be none')
-
-        user = self.create_user(username, email, password)
-        user.is_superuser = True
-        user.is_staff = True
-        user.save()
-        return user
-
-
-AUTH_PROVIDERS = {'facebook': 'facebook', 'google': 'google',
-                  'twitter': 'twitter', 'email': 'email'}
-
-
-class User(AbstractBaseUser, PermissionsMixin):
-    username = models.CharField(max_length=255, unique=True, db_index=True)
-    email = models.EmailField(max_length=255, unique=True, db_index=True)
-    is_verified = models.BooleanField(default=False)
-    is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    auth_provider = models.CharField(
-        max_length=255, blank=False,
-        null=False, default=AUTH_PROVIDERS.get('email'))
-
-    USERNAME_FIELD = 'email'
-    REQUIRED_FIELDS = ['username']
-
-    objects = UserManager()
+class Category(models.Model):
+    name = models.CharField(max_length=100)
 
     def __str__(self):
-        return self.email
+        return f"{ self.name }"
+
+class Vaccine(models.Model):
+    title = models.CharField(max_length=255)
+    vaccine_name = models.ManyToManyField(User, through='Cart')
+   
+    batch_number = models.DecimalField(max_digits=12, decimal_places=2)
+    drug_expiry = models.TextField()
+    user_profile = CloudinaryField('image')
+    next_appointment=models.CharField(max_length=50)
+    link = URLOrRelativeURLField(max_length=200)
+    category = models.ForeignKey(
+        Category, on_delete=models.CASCADE, related_name='vaccines', null=True)
     
-    def tokens(self):
-        refresh = RefreshToken.for_user(self)
-        return {
-            'refresh': str(refresh),
-            'access': str(refresh.access_token)
-        }
+
+    def __str__(self):
+        return f"{ self.title }"
+
+    def get_absolute_url(self):
+        return reverse('vaccines_detail', kwargs={'pk': self.pk})
+
+
+
+
+# profile model
+class Profile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    bio = models.TextField(max_length=500, blank=True)
+    profile_pic = CloudinaryField('image')
+    contact = models.CharField(max_length=100, blank=True)
+    location = models.CharField(max_length=100, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.user.username
+
+class Cart(models.Model):
+    vaccine = models.ForeignKey(Vaccine, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return f"CartID : { self.pk }"
+
+    def get_absolute_url(self):
+        return reverse('vaccine_detail', kwargs={'pk': self.pk})
+    
+          
+    
+    # growth=======>
+class Growth(models.Model):
+    patient = models.ForeignKey(User, on_delete=models.CASCADE)
+    patient_name=models.CharField(max_length=100)
+    age = models.IntegerField()
+    weight = models.IntegerField()
+    height = models.IntegerField()
+    HO = models.IntegerField()
+    date = models.DateField()
+    link = URLOrRelativeURLField(max_length=200)
+    
+
+    def __str__(self):
+        return f"{ self.age }"
+    
+    def get_absolute_url(self):
+            return reverse('', kwargs={'pk': self.pk})
+
+
+# emerging disease==============>
+class EmergingDisease(models.Model):
+    patient = models.ForeignKey(User, on_delete=models.CASCADE)
+    disease_name = models.CharField(max_length=200)
+    next_appointment=models.CharField(max_length=50)
+    link = URLOrRelativeURLField(max_length=200)
+    # category = models.ForeignKey(
+    #     Category, on_delete=models.CASCADE, related_name='desease', null=True)
+    
+
+    def __str__(self):
+        return f"{ self.disease_name }"
+
+    def get_absolute_url(self):
+        return reverse('desease_detail', kwargs={'pk': self.pk})
