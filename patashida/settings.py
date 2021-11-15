@@ -67,7 +67,6 @@ INSTALLED_APPS = [
     'drf_yasg',
     'url_or_relative_url_field',
     'corsheaders',
-    'agriapp.User',
     
     
 ]
