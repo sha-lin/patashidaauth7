@@ -44,7 +44,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-# AUTH_USER_MODEL = 'agriapp.User'
+AUTH_USER_MODEL = 'agriapp.User'
 
 
 
